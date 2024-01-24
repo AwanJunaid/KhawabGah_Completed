@@ -17,7 +17,7 @@ import { db } from "../../firebase/config";
 import { useNavigate } from "react-router-dom";
 import DropIn from "braintree-web-drop-in-react";
 
-const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => {
+const CheckoutForm = ({ clientToken, codClientToken, paymentMethod, onPaymentMethodChange }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [instance, setInstance] = useState(null);
   const [nonce, setNonce] = useState(null);
@@ -53,10 +53,12 @@ const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => 
       const { nonce: paymentNonce } = await instance.requestPaymentMethod();
       setNonce(paymentNonce);
       setIsLoading(false);
-      // You can send the nonce to your server for further processing
-      // For demonstration purposes, we simulate the server response with a delay
+
+      // Simulate server processing delay
       await new Promise((resolve) => setTimeout(resolve, 2000));
-      await saveOrder(); // Call your saveOrder function or any payment processing logic
+
+      // Process Braintree payment
+      await saveOrder();
     } catch (error) {
       console.error("Error processing Braintree payment:", error);
       setIsLoading(false);
@@ -64,8 +66,23 @@ const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => 
     }
   };
 
+  const handleCodPayment = async () => {
+    // Simulate COD processing delay
+    setIsLoading(true);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Process COD payment
+    await saveOrder();
+  };
+
   const saveOrder = async () => {
-    // Implement your logic for saving the order using Braintree nonce
+    let paymentNonce = null;
+
+    if (paymentMethod === "braintree") {
+      // If Braintree is selected, use the Braintree nonce
+      paymentNonce = nonce;
+    }
+
     const today = new Date();
     const date = today.toDateString();
     const time = today.toLocaleTimeString();
@@ -78,9 +95,10 @@ const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => 
       orderStatus: "Order Placed...",
       cartItems,
       shippingAddress,
-      paymentNonce: nonce, // Store the Braintree nonce in your order data
+      paymentNonce,
       createdAt: Timestamp.now().toDate(),
     };
+
     try {
       addDoc(collection(db, "orders"), orderConfig);
       dispatch(CLEAR_CART());
@@ -97,6 +115,8 @@ const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => 
 
     if (paymentMethod === "braintree" && instance) {
       await handleBraintreePayment();
+    } else if (paymentMethod === "cod") {
+      await handleCodPayment();
     } else {
       // Handle other payment methods here (if any)
     }
@@ -125,16 +145,25 @@ const CheckoutForm = ({ clientToken, paymentMethod, onPaymentMethodChange }) => 
                   />
                   Braintree
                 </label>
+                <label>
+                  <input
+                    type="radio"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={() => handlePaymentMethodChange("cod")}
+                  />
+                  Cash on Delivery
+                </label>
               </div>
               {paymentMethod === "braintree" && (
                 <DropIn
                   options={{
                     authorization: clientToken,
                   }}
-                   onInstance={(instance) => {
-                        setInstance(instance);
-                        console.log("Braintree Instance:", instance);
-                      }}
+                  onInstance={(instance) => {
+                    setInstance(instance);
+                    console.log("Braintree Instance:", instance);
+                  }}
                 />
               )}
               <button
